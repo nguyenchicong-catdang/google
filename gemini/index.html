@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <title>Ứng dụng Gemini API</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      body { min-height: 100vh; }
+      /* CSS cho hộp thông báo */
+      #messageBox {
+        display: none;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        border-radius: 0.5rem;
+        text-align: center;
+        font-weight: 600;
+        background-color: #fee2e2;
+        color: #ef4444;
+      }
+    </style>
+  </head>
+  <body class="bg-gray-100 flex items-center justify-center p-4">
+    <!--
+        Đây là thẻ <img> đã được sửa.
+        ID tệp được trích xuất từ URL gốc của bạn: 1UIaKb-hoPLpUwfDbIHTrPebnR6kn9cij
+        URL tải xuống trực tiếp được tạo có dạng: https://drive.google.com/uc?id={fileId}
+        -->
+        <div class="mt-4 flex justify-center">
+            <img 
+                src="https://drive.usercontent.google.com/download?id=1UIaKb-hoPLpUwfDbIHTrPebnR6kn9cij&export=view" 
+                alt="Hình ảnh từ Google Drive" 
+                class="rounded-lg shadow-md max-h-64 object-contain" 
+                onload="console.log('Hình ảnh tải thành công');" 
+                onerror="this.onerror=null;this.src='https://placehold.co/600x400/CCCCCC/333333?text=Lỗi+tải+ảnh'; console.error('Lỗi khi tải hình ảnh từ Google Drive. Vui lòng kiểm tra quyền truy cập công khai của tệp.');">
+        </div>
+
+    <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-2xl">
+      <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">Trò chuyện với Gemini</h1>
+      
+      <!-- Hộp thông báo -->
+      <div id="messageBox"></div>
+
+      <div class="flex flex-col space-y-4 mb-6">
+        <textarea
+          id="promptInput"
+          rows="4"
+          class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow"
+          placeholder="Nhập câu hỏi của bạn (ví dụ: 'Tôi muốn mua chai nước hoa Chanel 100ml màu đỏ')..."
+        ></textarea>
+        <button
+          id="submitButton"
+          class="w-full bg-blue-600 text-white font-semibold py-3 rounded-lg hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+        >
+          Gửi yêu cầu
+        </button>
+      </div>
+
+      <div
+        id="responseDiv"
+        class="bg-gray-50 p-4 rounded-lg border border-gray-200 text-gray-700 whitespace-pre-wrap overflow-y-auto max-h-96"
+      >
+        <p class="text-gray-400 text-center">Phản hồi từ Gemini sẽ xuất hiện ở đây.</p>
+      </div>
+      
+      <div id="loadingSpinner" class="flex justify-center mt-4 hidden">
+        <div class="w-8 h-8 border-4 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    </div>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        const promptInput = document.getElementById('promptInput');
+        const submitButton = document.getElementById('submitButton');
+        const responseDiv = document.getElementById('responseDiv');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const messageBox = document.getElementById('messageBox');
+
+        function showMessage(message) {
+          messageBox.textContent = message;
+          messageBox.style.display = 'block';
+        }
+
+        function hideMessage() {
+          messageBox.style.display = 'none';
+        }
+
+        function processQuery() {
+          console.log('--- Bắt đầu sự kiện Gửi yêu cầu ---');
+          const prompt = promptInput.value.trim();
+          
+          if (prompt === '') {
+            console.log('Lỗi: Prompt rỗng.');
+            showMessage('Vui lòng nhập câu hỏi của bạn.');
+            return;
+          }
+          
+          hideMessage();
+          responseDiv.innerHTML = '';
+          loadingSpinner.classList.remove('hidden');
+          submitButton.disabled = true;
+
+          console.log('Gọi google.script.run với prompt:', prompt);
+          google.script.run
+            .withSuccessHandler(onSuccess)
+            .withFailureHandler(onFailure)
+            .handleUserQuery(prompt);
+        }
+
+        submitButton.addEventListener('click', processQuery);
+        promptInput.addEventListener('keydown', function(event) {
+          if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            processQuery();
+          }
+        });
+
+        function onSuccess(responseString) {
+          console.log('Yêu cầu thành công. Phản hồi nhận được:', responseString);
+          loadingSpinner.classList.add('hidden');
+          submitButton.disabled = false;
+          
+          try {
+            const response = JSON.parse(responseString);
+            
+            let htmlContent = `<p>${response.text}</p>`;
+            if (response.imageUrl) {
+              // CHÚ Ý QUAN TRỌNG: Để hình ảnh hiển thị, tệp trên Google Drive phải được chia sẻ công khai
+              // với quyền "Bất kỳ ai có đường liên kết".
+              // Mã này sẽ thay thế '/view' bằng '/preview' để cố gắng tạo liên kết trực tiếp đến hình ảnh.
+              const imageUrl = response.imageUrl.replace('/view', '/preview');
+              console.log('Sử dụng URL trực tiếp:', imageUrl);
+              htmlContent += `
+                <div class="mt-4 flex justify-center">
+                  <img 
+                    src="${imageUrl}" 
+                    alt="Sản phẩm" 
+                    class="rounded-lg shadow-md max-h-64 object-contain" 
+                    onload="console.log('Hình ảnh tải thành công:', this.src);" 
+                    onerror="console.error('Lỗi khi tải hình ảnh từ URL:', this.src, '. Vui lòng kiểm tra quyền truy cập công khai của tệp trên Google Drive.'); this.style.display='none';">
+                </div>`;
+            }
+            
+            responseDiv.innerHTML = htmlContent;
+
+          } catch (e) {
+            console.error('Lỗi khi phân tích JSON:', e);
+            responseDiv.innerHTML = `<p class="text-red-500">Đã xảy ra lỗi khi phân tích phản hồi: ${e.message}</p>`;
+          }
+        }
+
+        function onFailure(error) {
+          console.error('Yêu cầu thất bại:', error);
+          loadingSpinner.classList.add('hidden');
+          submitButton.disabled = false;
+          const errorMessage = `Đã xảy ra lỗi: ${error.message}`;
+          responseDiv.innerHTML = `<p class="text-red-500">${errorMessage}</p>`;
+          showMessage(errorMessage);
+        }
+      });
+    </script>
+  </body>
+</html>
